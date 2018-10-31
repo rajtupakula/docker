@@ -1,0 +1,34 @@
+#!/bin/bash
+ #set -x
+DATAPATH='/home/ec2-user/docker/updater/data'
+
+if [ ! -d "${DATAPATH}" ]; then
+        mkdir "${DATAPATH}";
+fi
+IMAGES=$(docker ps --format "{{.Image}}")
+for IMAGE in $IMAGES; do
+        ORIGIMAGE=${IMAGE}
+        if [[ "$IMAGE" != *\/* ]]; then
+                IMAGE=library/${IMAGE}
+        fi
+        IMAGE=${IMAGE%%:*}
+        echo "Checking ${IMAGE}"
+        PARSED=${IMAGE//\//.}
+	echo "{$PARSED}"
+        if [ ! -f "${DATAPATH}/${PARSED}" ]; then
+                # File doesn't exist yet, make baseline
+                echo "Setting baseline for ${IMAGE}"
+                curl -s "https://registry.hub.docker.com/v2/repositories/${IMAGE}/tags/" > "${DATAPATH}/${PARSED}"
+        else
+                # File does exist, do a compare
+                NEW=$(curl -s "https://registry.hub.docker.com/v2/repositories/${IMAGE}/tags/")
+                OLD=$(cat "${DATAPATH}/${PARSED}")
+                if [[ "${NEW}" == "${OLD}" ]]; then
+                        echo "Image ${IMAGE} is up to date";
+                else
+                        echo ${NEW} > "${DATAPATH}/${PARSED}"
+                        echo "Image ${IMAGE} needs to be updated";
+                fi
+
+        fi
+done;

@@ -1,0 +1,28 @@
+#!/bin/bash
+
+
+function needsUpdates() {
+        RESULT=$(docker exec ${1} bash -c ' \
+                if [[ -f /etc/apt/sources.list ]]; then \
+                grep security /etc/apt/sources.list > /tmp/security.list; \
+                apt-get update > /dev/null; \
+                apt-get upgrade -oDir::Etc::Sourcelist=/tmp/security.list -s; \
+                fi; \
+                ')
+        RESULT=$(echo $RESULT)
+        GOODRESULT="Reading package lists... Building dependency tree... Reading state information... Calculating upgrade... 0 upgraded, 0 newly installed, 0 to remove and 0 not upgraded."
+        if [[ "${RESULT}" != "" ]] && [[ "${RESULT}" != "${GOODRESULT}" ]]; then
+                return 0
+        else
+                return 1
+        fi
+}
+
+
+CONTAINERS=$(docker ps --format "{{.Names}}")
+for CONTAINER in $CONTAINERS; do
+        echo "Checking ${CONTAINER}"
+        if needsUpdates $CONTAINER; then
+                echo "Container ${1} needs security updates";
+        fi
+done
